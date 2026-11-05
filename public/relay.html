@@ -1,0 +1,568 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>FlowingNotes</title>
+		<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%234f46e5'/%3E%3Cpath d='M9 23c5.5 0 5.5-7 11-7' stroke='white' stroke-width='3' fill='none' stroke-linecap='round'/%3E%3Ccircle cx='22' cy='11' r='2.6' fill='white'/%3E%3C/svg%3E" sizes="32x32">
+		<!-- Scramjet client and BareMux (loaded only on this page, never on the notepad homepage) -->
+		<script src="/scram/scramjet.all.js"></script>
+		<script src="/baremux/index.js"></script>
+		<script src="/config.js"></script>
+		<style>
+			:root,
+			[data-theme="light"] {
+				--bg: #f5f6f8;
+				--surface: #ffffff;
+				--surface-2: #f0f1f4;
+				--border: #e3e5ea;
+				--border-strong: #d3d6dd;
+				--text: #171a21;
+				--text-muted: #5c6470;
+				--text-faint: #9aa1ac;
+				--accent: #4f46e5;
+				--accent-hover: #4338ca;
+				--danger: #d92d20;
+				--danger-soft: #fef1f0;
+				--danger-border: #f2c1c1;
+				--success: #12805c;
+				--shadow-sm: 0 1px 2px rgba(16, 24, 40, .06);
+				--shadow-md: 0 4px 12px rgba(16, 24, 40, .08);
+				--shadow-lg: 0 12px 32px rgba(16, 24, 40, .14);
+				--transition: 160ms cubic-bezier(.16, 1, .3, 1);
+			}
+			[data-theme="dark"] {
+				--bg: #0f1115;
+				--surface: #171a20;
+				--surface-2: #1d212a;
+				--border: #2a2f39;
+				--border-strong: #3a4150;
+				--text: #e7e9ee;
+				--text-muted: #a3aab5;
+				--text-faint: #6b7280;
+				--accent: #6366f1;
+				--accent-hover: #818cf8;
+				--danger: #f97066;
+				--danger-soft: #2a1a19;
+				--danger-border: #4a2a28;
+				--success: #4ec295;
+				--shadow-sm: 0 1px 2px rgba(0, 0, 0, .35);
+				--shadow-md: 0 4px 12px rgba(0, 0, 0, .4);
+				--shadow-lg: 0 12px 32px rgba(0, 0, 0, .5);
+			}
+			html,
+			body {
+				height: 100%;
+				margin: 0;
+			}
+			body {
+				display: flex;
+				flex-direction: column;
+				background: var(--bg);
+				color: var(--text);
+				font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, "Helvetica Neue", Arial, sans-serif;
+				-webkit-font-smoothing: antialiased;
+			}
+			header {
+				display: flex;
+				align-items: center;
+				gap: 6px;
+				height: 56px;
+				padding: 0 12px;
+				background: var(--surface);
+				border-bottom: 1px solid var(--border);
+				flex: none;
+			}
+			.brand {
+				display: flex;
+				align-items: center;
+				gap: 9px;
+				padding: 0 6px 0 4px;
+				color: var(--text);
+				font-size: 15px;
+				font-weight: 700;
+				letter-spacing: -.01em;
+				text-decoration: none;
+				flex: none;
+			}
+			.brand:hover {
+				text-decoration: none;
+			}
+			header button,
+			header a.icon-btn {
+				display: inline-flex;
+				align-items: center;
+				justify-content: center;
+				width: 34px;
+				height: 34px;
+				border: 0;
+				border-radius: 8px;
+				background: transparent;
+				color: var(--text-muted);
+				text-decoration: none;
+				cursor: pointer;
+				flex: none;
+				transition: background var(--transition), color var(--transition);
+			}
+			header button:hover,
+			header a.icon-btn:hover {
+				background: var(--surface-2);
+				color: var(--text);
+			}
+			form#bar {
+				flex: 1;
+				min-width: 0;
+			}
+			#address {
+				width: 100%;
+				box-sizing: border-box;
+				height: 36px;
+				padding: 0 14px;
+				border: 1px solid var(--border-strong);
+				border-radius: 8px;
+				background: var(--surface);
+				color: var(--text);
+				font: inherit;
+				outline: none;
+				box-shadow: var(--shadow-sm);
+				transition: border-color var(--transition), box-shadow var(--transition);
+			}
+			#address::placeholder {
+				color: var(--text-faint);
+			}
+			#address:focus {
+				outline: none;
+				border-color: var(--accent);
+				box-shadow: 0 0 0 3px rgba(99, 102, 241, .16);
+			}
+			#dot {
+				width: 9px;
+				height: 9px;
+				border-radius: 50%;
+				background: var(--border-strong);
+				flex: none;
+				margin: 0 2px;
+			}
+			#dot.ok {
+				background: var(--success);
+			}
+			#dot.bad {
+				background: var(--danger);
+			}
+			#loading {
+				height: 2px;
+				background: transparent;
+				flex: none;
+				overflow: hidden;
+			}
+			#loading.active {
+				background: var(--surface-2);
+			}
+			#loading.active::after {
+				content: "";
+				display: block;
+				height: 100%;
+				width: 40%;
+				background: var(--accent);
+				animation: slide 1s linear infinite;
+			}
+			@keyframes slide {
+				from {
+					transform: translateX(-100%);
+				}
+				to {
+					transform: translateX(350%);
+				}
+			}
+			main {
+				position: relative;
+				flex: 1;
+				min-height: 0;
+				background: var(--surface);
+			}
+			main iframe {
+				display: block;
+				width: 100%;
+				height: 100%;
+				border: 0;
+				background: var(--surface);
+			}
+			#start {
+				position: absolute;
+				inset: 0;
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				justify-content: center;
+				gap: 8px;
+				color: var(--text-muted);
+				background: var(--surface);
+			}
+			#start .start-icon {
+				width: 44px;
+				height: 44px;
+				border-radius: 12px;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				background: var(--surface-2);
+				color: var(--text-faint);
+				margin-bottom: 4px;
+			}
+			#start .start-title {
+				font-size: 15px;
+				font-weight: 600;
+				color: var(--text);
+			}
+			#start .start-text {
+				font-size: 13px;
+				max-width: 380px;
+				text-align: center;
+				padding: 0 20px;
+			}
+			#error {
+				position: absolute;
+				left: 50%;
+				bottom: 18px;
+				transform: translateX(-50%);
+				max-width: 80%;
+				box-sizing: border-box;
+				padding: 11px 14px;
+				border-radius: 8px;
+				background: var(--danger-soft);
+				border: 1px solid var(--danger-border);
+				color: var(--danger);
+				font-size: 13px;
+				font-weight: 500;
+				box-shadow: var(--shadow-lg);
+				display: none;
+			}
+			#error.visible {
+				display: block;
+			}
+			@media (max-width: 640px) {
+				.brand span {
+					display: none;
+				}
+			}
+		</style>
+	</head>
+	<body>
+		<header>
+			<a class="brand" href="./index.html" title="FlowingNotes">
+				<svg viewBox="0 0 32 32" width="24" height="24" aria-hidden="true"><rect width="32" height="32" rx="8" fill="var(--accent)"/><path d="M9 23c5.5 0 5.5-7 11-7" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round"/><circle cx="22" cy="11" r="2.6" fill="#fff"/></svg>
+				<span>FlowingNotes</span>
+			</a>
+			<button id="back" type="button" title="Back" aria-label="Back">
+				<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+			</button>
+			<button id="forward" type="button" title="Forward" aria-label="Forward">
+				<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+			</button>
+			<button id="reload" type="button" title="Reload" aria-label="Reload">
+				<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><path d="M20.5 15a9 9 0 1 1-2-9.4L23 10"/></svg>
+			</button>
+			<form id="bar" autocomplete="off">
+				<input id="address" type="text" placeholder="Search or enter address" spellcheck="false" aria-label="Address or search" />
+			</form>
+			<a id="home" class="icon-btn" href="./index.html" title="FlowingNotes home" aria-label="FlowingNotes home">
+				<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9.5 12 3l9 6.5V21a1.5 1.5 0 0 1-1.5 1.5H15v-7H9v7H4.5A1.5 1.5 0 0 1 3 21z"/></svg>
+			</a>
+			<button id="theme" type="button" title="Toggle theme" aria-label="Toggle theme">
+				<svg id="theme-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+			</button>
+			<span id="dot" title="Proxy backend status"></span>
+		</header>
+		<div id="loading"></div>
+		<main>
+			<div id="start">
+				<div class="start-icon">
+					<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+				</div>
+				<div class="start-title">Ready to browse</div>
+				<div class="start-text">Enter an address in the bar above to start browsing.</div>
+			</div>
+			<div id="error" role="alert"></div>
+		</main>
+
+		<script>
+			"use strict";
+			(function () {
+				var els = {
+					back: document.getElementById("back"),
+					forward: document.getElementById("forward"),
+					reload: document.getElementById("reload"),
+					bar: document.getElementById("bar"),
+					address: document.getElementById("address"),
+					home: document.getElementById("home"),
+					dot: document.getElementById("dot"),
+					loading: document.getElementById("loading"),
+					main: document.querySelector("main"),
+					start: document.getElementById("start"),
+					error: document.getElementById("error"),
+				};
+
+				var scramjet = null; // ScramjetController, created during boot
+				var frame = null; // ScramjetFrame, created on first navigation
+				var booted = false;
+				var loadTimer = null;
+
+				/* ---------- helpers ---------- */
+
+				function wispUrl() {
+					// The wisp endpoint on the backend, e.g. wss://app.onrender.com/wisp/
+					return (
+						String(CONFIG.BACKEND_URL)
+							.replace(/^http/i, "ws")
+							.replace(/\/+$/, "") + "/wisp/"
+					);
+				}
+
+				function showError(message) {
+					els.error.textContent = message;
+					els.error.classList.add("visible");
+					clearTimeout(els.error._t);
+					els.error._t = setTimeout(function () {
+						els.error.classList.remove("visible");
+					}, 8000);
+				}
+
+				function setLoading(on) {
+					clearTimeout(loadTimer);
+					if (on) {
+						els.loading.classList.add("active");
+						loadTimer = setTimeout(function () {
+							// Still loading after a long time: give the user feedback.
+							showError("Still loading — the site may be slow, blocked, or the proxy backend may be asleep.");
+						}, 25000);
+					} else {
+						els.loading.classList.remove("active");
+					}
+				}
+
+				// Turn address bar input into a URL: full URLs pass through,
+				// domains get https:// prepended, anything else becomes a search.
+				function resolveInput(input) {
+					input = input.trim();
+					if (!input) return null;
+					try {
+						return new URL(input).toString();
+					} catch (err) {
+						/* not a full URL */
+					}
+					try {
+						var url = new URL("https://" + input);
+						if (url.hostname.indexOf(".") !== -1) return url.toString();
+					} catch (err) {
+						/* not a domain either */
+					}
+					return CONFIG.SEARCH_ENGINE.replace("%s", encodeURIComponent(input));
+				}
+
+				/* ---------- backend status (cross-origin, exercises CORS) ---------- */
+
+				function checkBackend() {
+					fetch(CONFIG.BACKEND_URL.replace(/\/+$/, "") + "/health", { mode: "cors" })
+						.then(function (res) {
+							if (!res.ok) throw new Error("HTTP " + res.status);
+							els.dot.className = "ok";
+							els.dot.title = "Proxy backend reachable";
+						})
+						.catch(function () {
+							els.dot.className = "bad";
+							els.dot.title = "Proxy backend unreachable";
+							showError("Proxy backend unreachable at " + CONFIG.BACKEND_URL + " — check that it is deployed and that BACKEND_URL in config.js is correct.");
+						});
+				}
+
+				/* ---------- service worker + scramjet boot ---------- */
+
+				function registerSW() {
+					if (!("serviceWorker" in navigator)) {
+						return Promise.reject(new Error("This browser does not support service workers."));
+					}
+					return navigator.serviceWorker.register("/sw.js").then(function (reg) {
+						if (reg.active) return reg;
+						var worker = reg.installing || reg.waiting;
+						if (!worker) return reg;
+						return new Promise(function (resolve) {
+							worker.addEventListener("statechange", function () {
+								if (worker.state === "activated") resolve(reg);
+							});
+						});
+					});
+				}
+
+				// The transport's wasm compiles asynchronously inside its worker.
+				// A fetch through the transport forces it to finish loading; retry
+				// while it reports "not loaded" so the first navigation can't race it.
+				function warmupTransport() {
+					var url = CONFIG.BACKEND_URL.replace(/\/+$/, "") + "/health";
+					var client = new BareMux.BareClient();
+					var attempt = 0;
+					function tryFetch() {
+						attempt++;
+						return client
+							.fetch(url)
+							.then(function () {
+								return true;
+							})
+							.catch(function retry(err) {
+								var msg = String((err && err.message) || err);
+								if (attempt < 40 && (msg.indexOf("wasm not loaded") !== -1 || msg.indexOf("not ready") !== -1)) {
+									return new Promise(function (r) {
+										setTimeout(r, 250);
+									}).then(tryFetch);
+								}
+								// A failed request that got past loading still means the
+								// transport is up; real browsing errors surface on their own.
+								return true;
+							});
+					}
+					return tryFetch();
+				}
+
+				function boot() {
+					if (booted) return Promise.resolve();
+					booted = true;
+					setLoading(true);
+
+					var controller = new ($scramjetLoadController().ScramjetController)({
+						files: {
+							wasm: "/scram/scramjet.wasm.wasm",
+							all: "/scram/scramjet.all.js",
+							sync: "/scram/scramjet.sync.js",
+						},
+					});
+
+					return controller
+						.init() // writes the Scramjet config the service worker will read
+						.then(function () {
+							return registerSW();
+						})
+						.then(function () {
+							// Route all proxied traffic through the backend's wisp endpoint.
+							var connection = new BareMux.BareMuxConnection("/baremux/worker.js");
+							return connection.setTransport("/libcurl/index.mjs", [{ websocket: wispUrl() }]);
+						})
+						.then(function () {
+							// Wait for the transport's wasm to finish loading.
+							return warmupTransport();
+						})
+						.then(function () {
+							scramjet = controller;
+							setLoading(false);
+						})
+						.catch(function (err) {
+							booted = false;
+							setLoading(false);
+							showError("Failed to start the proxy: " + (err && err.message ? err.message : err));
+							throw err;
+						});
+				}
+
+				function navigate(input) {
+					var url = resolveInput(input);
+					if (!url) return;
+
+					boot()
+						.then(function () {
+							if (!frame) {
+								frame = scramjet.createFrame();
+								frame.frame.setAttribute("aria-label", "Browsing area");
+								els.main.appendChild(frame.frame);
+								frame.frame.addEventListener("load", function () {
+									setLoading(false);
+									syncAddress();
+								});
+								frame.addEventListener("urlchange", function () {
+									setLoading(false);
+									syncAddress();
+								});
+								// Catch navigations that fire no events (link clicks,
+								// pushState): check the frame URL once a second.
+								setInterval(syncAddress, 1000);
+							}
+							els.start.style.display = "none";
+							setLoading(true);
+							try {
+								frame.go(url);
+							} catch (err) {
+								setLoading(false);
+								showError("Couldn't open that address: " + (err && err.message ? err.message : err));
+							}
+						})
+						.catch(function () {
+							/* boot() already showed an error */
+						});
+				}
+
+				// Keep the address bar in sync with the page in the frame.
+				function syncAddress() {
+					if (!frame || document.activeElement === els.address) return;
+					try {
+						var real = realUrl(frame.frame.contentWindow.location.href);
+						if (real && real !== els.address.value) {
+							els.address.value = real;
+						}
+					} catch (err) {
+						/* frame not accessible yet */
+					}
+				}
+
+				function realUrl(url) {
+					try {
+						return scramjet.decodeUrl(url);
+					} catch (err) {
+						return url;
+					}
+				}
+
+				/* ---------- wiring ---------- */
+
+				els.bar.addEventListener("submit", function (event) {
+					event.preventDefault();
+					els.address.blur();
+					navigate(els.address.value);
+				});
+
+				els.back.addEventListener("click", function () {
+					if (frame) frame.back();
+				});
+				els.forward.addEventListener("click", function () {
+					if (frame) frame.forward();
+				});
+				els.reload.addEventListener("click", function () {
+					if (frame) {
+						setLoading(true);
+						frame.reload();
+					}
+				});
+
+				checkBackend();
+				setInterval(checkBackend, 60000);
+
+				// Theme: follows FlowingNotes' saved preference when present.
+				var THEME_KEY = "fn.theme";
+				var saved = null;
+				try {
+					saved = JSON.parse(localStorage.getItem("fn.settings") || "null");
+				} catch (e) {}
+				var theme = saved && saved.theme ? saved.theme : localStorage.getItem(THEME_KEY) || "light";
+				var themeIcon = document.getElementById("theme-icon");
+				function applyTheme(t) {
+					document.documentElement.setAttribute("data-theme", t);
+					themeIcon.innerHTML =
+						t === "dark"
+							? '<circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="6.34" y2="6.34"/><line x1="17.66" y1="17.66" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="6.34" y2="17.66"/><line x1="17.66" y1="6.34" x2="19.07" y2="4.93"/>'
+							: '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>';
+					localStorage.setItem(THEME_KEY, t);
+				}
+				applyTheme(theme);
+				document.getElementById("theme").addEventListener("click", function () {
+					applyTheme(document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark");
+				});
+			})();
+		</script>
+	</body>
+</html>
